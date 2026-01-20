@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import Shop from "./pages/Shop";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
+import SharedFile from "./pages/SharedFile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ const App = () => (
                   <Admin />
                 </ProtectedRoute>
               } />
+              <Route path="/shared/:token" element={<SharedFile />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

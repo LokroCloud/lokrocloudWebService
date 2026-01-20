@@ -6,10 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Cloud, Upload, FolderPlus, File, Folder, Download, Trash2, MoreVertical, LogOut, Store, Settings, ChevronLeft, Search, Coins, Shield } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { Cloud, Upload, FolderPlus, File, Folder, Download, Trash2, MoreVertical, LogOut, Store, Settings, ChevronLeft, Search, Coins, Shield, Eye, Share2, FileText, Image as ImageIcon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import FilePreview from '@/components/FilePreview';
+import ShareFileDialog from '@/components/ShareFileDialog';
 
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return '0 B';
@@ -28,6 +30,8 @@ const Dashboard = () => {
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  const [shareFile, setShareFile] = useState<FileItem | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -254,35 +258,81 @@ const Dashboard = () => {
                 </Card>
               ))}
               
-              {filteredFiles.map((file) => (
-                <Card key={file.id} className="hover:bg-accent transition-colors">
-                  <CardContent className="p-4 flex flex-col items-center text-center">
-                    <File className="h-12 w-12 text-muted-foreground mb-2" />
-                    <span className="text-sm font-medium truncate w-full">{file.file_name}</span>
-                    <span className="text-xs text-muted-foreground">{formatBytes(file.file_size)}</span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="mt-2">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => downloadFile(file.file_path, file.file_name)}>
-                          <Download className="mr-2 h-4 w-4" />
-                          Download
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => deleteFile(file.id, file.file_path, file.file_size)} className="text-destructive">
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </CardContent>
-                </Card>
-              ))}
+              {filteredFiles.map((file) => {
+                const mimeType = file.mime_type || '';
+                const isImage = mimeType.startsWith('image/');
+                const isPdf = mimeType === 'application/pdf';
+                const isPreviewable = isImage || isPdf || mimeType.startsWith('video/') || mimeType.startsWith('audio/');
+
+                return (
+                  <Card 
+                    key={file.id} 
+                    className="hover:bg-accent transition-colors cursor-pointer"
+                    onClick={() => isPreviewable && setPreviewFile(file)}
+                  >
+                    <CardContent className="p-4 flex flex-col items-center text-center">
+                      {isImage ? (
+                        <ImageIcon className="h-12 w-12 text-primary mb-2" />
+                      ) : isPdf ? (
+                        <FileText className="h-12 w-12 text-primary mb-2" />
+                      ) : (
+                        <File className="h-12 w-12 text-muted-foreground mb-2" />
+                      )}
+                      <span className="text-sm font-medium truncate w-full">{file.file_name}</span>
+                      <span className="text-xs text-muted-foreground">{formatBytes(file.file_size)}</span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="sm" className="mt-2">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          {isPreviewable && (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewFile(file); }}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Preview
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setShareFile(file); }}>
+                            <Share2 className="mr-2 h-4 w-4" />
+                            Share
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); downloadFile(file.file_path, file.file_name); }}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Download
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={(e) => { e.stopPropagation(); deleteFile(file.id, file.file_path, file.file_size); }} 
+                            className="text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>
+
+        {/* File Preview Dialog */}
+        <FilePreview
+          open={!!previewFile}
+          onOpenChange={(open) => !open && setPreviewFile(null)}
+          file={previewFile}
+          onDownload={() => previewFile && downloadFile(previewFile.file_path, previewFile.file_name)}
+        />
+
+        {/* Share File Dialog */}
+        <ShareFileDialog
+          open={!!shareFile}
+          onOpenChange={(open) => !open && setShareFile(null)}
+          file={shareFile}
+        />
       </div>
     </div>
   );
