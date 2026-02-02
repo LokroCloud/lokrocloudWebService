@@ -14,6 +14,7 @@ import Shop from "./pages/Shop";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
 import SharedFile from "./pages/SharedFile";
+import JoinWorkspace from "./pages/JoinWorkspace";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -51,6 +52,7 @@ const App = () => (
                 </ProtectedRoute>
               } />
               <Route path="/shared/:token" element={<SharedFile />} />
+              <Route path="/join/:token" element={<JoinWorkspace />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

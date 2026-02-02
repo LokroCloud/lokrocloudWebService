@@ -204,6 +204,42 @@ export const useFiles = () => {
     }
   };
 
+  const renameFile = async (fileId: string, newName: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('files')
+        .update({ file_name: newName })
+        .eq('id', fileId);
+
+      if (error) throw error;
+      toast.success('File renamed');
+      setFiles(prev => prev.map(f => f.id === fileId ? { ...f, file_name: newName } : f));
+    } catch (error) {
+      console.error('Error renaming file:', error);
+      toast.error('Failed to rename file');
+    }
+  };
+
+  const renameFolder = async (folderId: string, newName: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('folders')
+        .update({ name: newName })
+        .eq('id', folderId);
+
+      if (error) throw error;
+      toast.success('Folder renamed');
+      setFolders(prev => prev.map(f => f.id === folderId ? { ...f, name: newName } : f));
+    } catch (error) {
+      console.error('Error renaming folder:', error);
+      toast.error('Failed to rename folder');
+    }
+  };
+
   const downloadFile = async (filePath: string, fileName: string) => {
     try {
       const { data, error } = await supabase.storage
@@ -238,5 +274,7 @@ export const useFiles = () => {
     deleteFile,
     deleteFolder,
     downloadFile,
+    renameFile,
+    renameFolder,
   };
 };
