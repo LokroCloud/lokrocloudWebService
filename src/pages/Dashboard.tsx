@@ -7,11 +7,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Cloud, Upload, FolderPlus, File, Folder, Download, Trash2, MoreVertical, LogOut, Store, Settings, ChevronLeft, Search, Coins, Shield, Eye, Share2, FileText, Image as ImageIcon } from 'lucide-react';
+import { Cloud, Upload, FolderPlus, File, Folder, Download, Trash2, MoreVertical, LogOut, Store, Settings, ChevronLeft, Search, Coins, Shield, Eye, Share2, FileText, Image as ImageIcon, Pencil, Users } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import FilePreview from '@/components/FilePreview';
 import ShareFileDialog from '@/components/ShareFileDialog';
+import RenameDialog from '@/components/RenameDialog';
+import WorkspaceManager from '@/components/WorkspaceManager';
 
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return '0 B';
@@ -23,7 +25,7 @@ const formatBytes = (bytes: number) => {
 
 const Dashboard = () => {
   const { profile, signOut } = useAuth();
-  const { files, folders, loading, uploading, fetchFiles, fetchFolders, createFolder, uploadFile, deleteFile, deleteFolder, downloadFile } = useFiles();
+  const { files, folders, loading, uploading, fetchFiles, fetchFolders, createFolder, uploadFile, deleteFile, deleteFolder, downloadFile, renameFile, renameFolder } = useFiles();
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderPath, setFolderPath] = useState<{ id: string | null; name: string }[]>([{ id: null, name: 'My Files' }]);
   const [newFolderName, setNewFolderName] = useState('');
@@ -32,6 +34,8 @@ const Dashboard = () => {
   const [dragOver, setDragOver] = useState(false);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [shareFile, setShareFile] = useState<FileItem | null>(null);
+  const [renameItem, setRenameItem] = useState<{ type: 'file' | 'folder'; id: string; name: string } | null>(null);
+  const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -98,6 +102,10 @@ const Dashboard = () => {
               <Coins className="h-4 w-4 text-warning" />
               <span className="font-medium">{profile?.credit_balance || 0} credits</span>
             </div>
+            <Button variant="outline" size="sm" onClick={() => setWorkspaceManagerOpen(true)}>
+              <Users className="mr-2 h-4 w-4" />
+              Workspaces
+            </Button>
             <Link to="/shop">
               <Button variant="outline" size="sm">
                 <Store className="mr-2 h-4 w-4" />
@@ -248,6 +256,11 @@ const Dashboard = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setRenameItem({ type: 'folder', id: folder.id, name: folder.name }); }}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }} className="text-destructive">
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
@@ -297,6 +310,10 @@ const Dashboard = () => {
                             <Share2 className="mr-2 h-4 w-4" />
                             Share
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setRenameItem({ type: 'file', id: file.id, name: file.file_name }); }}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Rename
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); downloadFile(file.file_path, file.file_name); }}>
                             <Download className="mr-2 h-4 w-4" />
                             Download
@@ -332,6 +349,27 @@ const Dashboard = () => {
           open={!!shareFile}
           onOpenChange={(open) => !open && setShareFile(null)}
           file={shareFile}
+        />
+
+        {/* Rename Dialog */}
+        <RenameDialog
+          open={!!renameItem}
+          onOpenChange={(open) => !open && setRenameItem(null)}
+          currentName={renameItem?.name || ''}
+          itemType={renameItem?.type || 'file'}
+          onRename={async (newName) => {
+            if (renameItem?.type === 'file') {
+              await renameFile(renameItem.id, newName);
+            } else if (renameItem?.type === 'folder') {
+              await renameFolder(renameItem.id, newName);
+            }
+          }}
+        />
+
+        {/* Workspace Manager */}
+        <WorkspaceManager
+          open={workspaceManagerOpen}
+          onOpenChange={setWorkspaceManagerOpen}
         />
       </div>
     </div>
