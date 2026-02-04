@@ -37,7 +37,7 @@ const Login = () => {
             <Cloud className="h-6 w-6 text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl">Welcome back</CardTitle>
-          <CardDescription>Sign in to your CloudVault account</CardDescription>
+          <CardDescription>Sign in to your LokroCloud account</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
