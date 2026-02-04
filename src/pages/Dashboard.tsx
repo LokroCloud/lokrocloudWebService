@@ -1,19 +1,23 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFiles, FileItem, FolderItem } from '@/hooks/useFiles';
+import { useBulkOperations } from '@/hooks/useBulkOperations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Cloud, Upload, FolderPlus, File, Folder, Download, Trash2, MoreVertical, LogOut, Store, Settings, ChevronLeft, Search, Coins, Shield, Eye, Share2, FileText, Image as ImageIcon, Pencil, Users } from 'lucide-react';
+import { Cloud, Upload, FolderPlus, File, Folder, Download, Trash2, MoreVertical, LogOut, Store, Settings, ChevronLeft, Search, Coins, Shield, Eye, Share2, FileText, Image as ImageIcon, Pencil, Users, Code, CheckSquare } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import FilePreview from '@/components/FilePreview';
 import ShareFileDialog from '@/components/ShareFileDialog';
 import RenameDialog from '@/components/RenameDialog';
 import WorkspaceManager from '@/components/WorkspaceManager';
+import BulkActionsBar from '@/components/BulkActionsBar';
+import CodeEditor from '@/components/CodeEditor';
 
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return '0 B';
@@ -21,6 +25,13 @@ const formatBytes = (bytes: number) => {
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const isCodeFile = (mimeType: string | null, fileName: string): boolean => {
+  const codeExtensions = ['.html', '.htm', '.css', '.js', '.json', '.xml', '.md', '.txt'];
+  const codeMimes = ['text/html', 'text/css', 'application/javascript', 'text/javascript', 'application/json', 'text/xml', 'text/markdown', 'text/plain'];
+  
+  return codeMimes.some(m => mimeType?.includes(m)) || codeExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
 };
 
 const Dashboard = () => {
@@ -36,12 +47,30 @@ const Dashboard = () => {
   const [shareFile, setShareFile] = useState<FileItem | null>(null);
   const [renameItem, setRenameItem] = useState<{ type: 'file' | 'folder'; id: string; name: string } | null>(null);
   const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState(false);
+  const [editFile, setEditFile] = useState<FileItem | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
   const navigate = useNavigate();
+
+  const bulkOps = useBulkOperations({
+    deleteFile,
+    deleteFolder,
+    onComplete: () => {
+      fetchFiles(currentFolderId);
+      fetchFolders(currentFolderId);
+    },
+  });
 
   useEffect(() => {
     fetchFiles(currentFolderId);
     fetchFolders(currentFolderId);
   }, [currentFolderId, fetchFiles, fetchFolders]);
+
+  // Exit selection mode when selection is cleared
+  useEffect(() => {
+    if (bulkOps.selectedCount === 0 && selectionMode) {
+      setSelectionMode(false);
+    }
+  }, [bulkOps.selectedCount, selectionMode]);
 
   const handleFileUpload = async (fileList: FileList | null) => {
     if (!fileList) return;
@@ -72,6 +101,7 @@ const Dashboard = () => {
   };
 
   const navigateToFolder = (folder: FolderItem) => {
+    if (selectionMode) return;
     setCurrentFolderId(folder.id);
     setFolderPath([...folderPath, { id: folder.id, name: folder.name }]);
   };
@@ -81,6 +111,18 @@ const Dashboard = () => {
     const newPath = folderPath.slice(0, -1);
     setFolderPath(newPath);
     setCurrentFolderId(newPath[newPath.length - 1].id);
+  };
+
+  const handleSelectAll = () => {
+    bulkOps.selectAllFiles(filteredFiles);
+    bulkOps.selectAllFolders(filteredFolders);
+  };
+
+  const toggleSelectionMode = () => {
+    if (selectionMode) {
+      bulkOps.clearSelection();
+    }
+    setSelectionMode(!selectionMode);
   };
 
   const storagePercent = profile ? (profile.storage_used / profile.storage_limit) * 100 : 0;
@@ -178,6 +220,15 @@ const Dashboard = () => {
           </div>
 
           <div className="flex gap-2 ml-auto">
+            <Button
+              variant={selectionMode ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={toggleSelectionMode}
+            >
+              <CheckSquare className="mr-2 h-4 w-4" />
+              {selectionMode ? 'Cancel' : 'Select'}
+            </Button>
+
             <Dialog open={folderDialogOpen} onOpenChange={setFolderDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">
@@ -243,30 +294,43 @@ const Dashboard = () => {
               {filteredFolders.map((folder) => (
                 <Card
                   key={folder.id}
-                  className="cursor-pointer hover:bg-accent transition-colors"
-                  onClick={() => navigateToFolder(folder)}
+                  className={`cursor-pointer hover:bg-accent transition-colors relative ${
+                    bulkOps.isFolderSelected(folder.id) ? 'ring-2 ring-primary bg-primary/10' : ''
+                  }`}
+                  onClick={() => selectionMode ? bulkOps.toggleFolderSelection(folder.id) : navigateToFolder(folder)}
                 >
+                  {selectionMode && (
+                    <div className="absolute top-2 left-2 z-10">
+                      <Checkbox
+                        checked={bulkOps.isFolderSelected(folder.id)}
+                        onCheckedChange={() => bulkOps.toggleFolderSelection(folder.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  )}
                   <CardContent className="p-4 flex flex-col items-center text-center">
                     <Folder className="h-12 w-12 text-primary mb-2" />
                     <span className="text-sm font-medium truncate w-full">{folder.name}</span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="sm" className="mt-2">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setRenameItem({ type: 'folder', id: folder.id, name: folder.name }); }}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Rename
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }} className="text-destructive">
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {!selectionMode && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="sm" className="mt-2">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setRenameItem({ type: 'folder', id: folder.id, name: folder.name }); }}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Rename
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); deleteFolder(folder.id); }} className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -275,59 +339,91 @@ const Dashboard = () => {
                 const mimeType = file.mime_type || '';
                 const isImage = mimeType.startsWith('image/');
                 const isPdf = mimeType === 'application/pdf';
+                const isCode = isCodeFile(mimeType, file.file_name);
                 const isPreviewable = isImage || isPdf || mimeType.startsWith('video/') || mimeType.startsWith('audio/');
+
+                const handleFileClick = () => {
+                  if (selectionMode) {
+                    bulkOps.toggleFileSelection(file.id);
+                  } else if (isCode) {
+                    setEditFile(file);
+                  } else if (isPreviewable) {
+                    setPreviewFile(file);
+                  }
+                };
 
                 return (
                   <Card 
                     key={file.id} 
-                    className="hover:bg-accent transition-colors cursor-pointer"
-                    onClick={() => isPreviewable && setPreviewFile(file)}
+                    className={`hover:bg-accent transition-colors cursor-pointer relative ${
+                      bulkOps.isFileSelected(file.id) ? 'ring-2 ring-primary bg-primary/10' : ''
+                    }`}
+                    onClick={handleFileClick}
                   >
+                    {selectionMode && (
+                      <div className="absolute top-2 left-2 z-10">
+                        <Checkbox
+                          checked={bulkOps.isFileSelected(file.id)}
+                          onCheckedChange={() => bulkOps.toggleFileSelection(file.id)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                    )}
                     <CardContent className="p-4 flex flex-col items-center text-center">
                       {isImage ? (
                         <ImageIcon className="h-12 w-12 text-primary mb-2" />
                       ) : isPdf ? (
                         <FileText className="h-12 w-12 text-primary mb-2" />
+                      ) : isCode ? (
+                        <Code className="h-12 w-12 text-primary mb-2" />
                       ) : (
                         <File className="h-12 w-12 text-muted-foreground mb-2" />
                       )}
                       <span className="text-sm font-medium truncate w-full">{file.file_name}</span>
                       <span className="text-xs text-muted-foreground">{formatBytes(file.file_size)}</span>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="sm" className="mt-2">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          {isPreviewable && (
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewFile(file); }}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Preview
+                      {!selectionMode && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="sm" className="mt-2">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            {isCode && (
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditFile(file); }}>
+                                <Code className="mr-2 h-4 w-4" />
+                                Edit Code
+                              </DropdownMenuItem>
+                            )}
+                            {isPreviewable && (
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setPreviewFile(file); }}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Preview
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setShareFile(file); }}>
+                              <Share2 className="mr-2 h-4 w-4" />
+                              Share
                             </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setShareFile(file); }}>
-                            <Share2 className="mr-2 h-4 w-4" />
-                            Share
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setRenameItem({ type: 'file', id: file.id, name: file.file_name }); }}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Rename
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); downloadFile(file.file_path, file.file_name); }}>
-                            <Download className="mr-2 h-4 w-4" />
-                            Download
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={(e) => { e.stopPropagation(); deleteFile(file.id, file.file_path, file.file_size); }} 
-                            className="text-destructive"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setRenameItem({ type: 'file', id: file.id, name: file.file_name }); }}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Rename
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); downloadFile(file.file_path, file.file_name); }}>
+                              <Download className="mr-2 h-4 w-4" />
+                              Download
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={(e) => { e.stopPropagation(); deleteFile(file.id, file.file_path, file.file_size); }} 
+                              className="text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </CardContent>
                   </Card>
                 );
@@ -336,12 +432,32 @@ const Dashboard = () => {
           )}
         </div>
 
+        {/* Bulk Actions Bar */}
+        <BulkActionsBar
+          selectedCount={bulkOps.selectedCount}
+          onClearSelection={bulkOps.clearSelection}
+          onSelectAll={handleSelectAll}
+          onBulkDelete={() => bulkOps.bulkDelete(filteredFiles, filteredFolders)}
+          onBulkDownload={() => bulkOps.bulkDownload(filteredFiles)}
+          isDeleting={bulkOps.isDeleting}
+          isDownloading={bulkOps.isDownloading}
+          totalItems={filteredFiles.length + filteredFolders.length}
+        />
+
         {/* File Preview Dialog */}
         <FilePreview
           open={!!previewFile}
           onOpenChange={(open) => !open && setPreviewFile(null)}
           file={previewFile}
           onDownload={() => previewFile && downloadFile(previewFile.file_path, previewFile.file_name)}
+        />
+
+        {/* Code Editor Dialog */}
+        <CodeEditor
+          open={!!editFile}
+          onOpenChange={(open) => !open && setEditFile(null)}
+          file={editFile}
+          onSave={() => fetchFiles(currentFolderId)}
         />
 
         {/* Share File Dialog */}
