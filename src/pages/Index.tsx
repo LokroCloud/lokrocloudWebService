@@ -10,7 +10,7 @@ const Index = () => {
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-2">
             <Cloud className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold">CloudVault</span>
+            <span className="text-2xl font-bold">LokroCloud</span>
           </div>
           <div className="flex gap-2">
             <Link to="/login">
@@ -51,7 +51,7 @@ const Index = () => {
         {/* Features */}
         <section className="py-16 px-4 bg-card/50">
           <div className="container mx-auto max-w-5xl">
-            <h2 className="text-3xl font-bold text-center mb-12">Why CloudVault?</h2>
+            <h2 className="text-3xl font-bold text-center mb-12">Why LokroCloud?</h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="text-center p-6">
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
@@ -87,7 +87,7 @@ const Index = () => {
       </main>
 
       <footer className="border-t border-border py-8 px-4 text-center text-muted-foreground">
-        <p>&copy; 2026 CloudVault. All rights reserved.</p>
+        <p>&copy; 2026 LokroCloud. All rights reserved.</p>
       </footer>
     </div>
   );
